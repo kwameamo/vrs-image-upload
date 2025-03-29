@@ -303,7 +303,14 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
   const startCamera = async () => {
     try {
       setUsingCamera(true);
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      // Specify that we want to use the rear camera (environment-facing)
+      const constraints = {
+        video: {
+          facingMode: "environment" // This requests the rear camera
+        }
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
