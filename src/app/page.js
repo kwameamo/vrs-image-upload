@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const VRSApp = () => {
   // Authentication state
@@ -131,7 +131,7 @@ const LoginPage = ({ onLoginSuccess }) => {
                 className="w-full"
               />
             </div>
-            <h2 className="text-2xl font-bold text-center">
+            <h2 className="text-2xl font-bold text-center text-gray-800">
               {showResetForm ? 'Reset Password' : 'VRS Image Upload'}
             </h2>
           </div>
@@ -156,7 +156,7 @@ const LoginPage = ({ onLoginSuccess }) => {
             {!showResetForm ? (
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <label htmlFor="stationId" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="stationId" className="block text-sm font-medium text-gray-800">
                     Station ID
                   </label>
                   <select
@@ -175,7 +175,7 @@ const LoginPage = ({ onLoginSuccess }) => {
                 </div>
                 
                 <div className="space-y-2">
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-800">
                     Password
                   </label>
                   <div className="relative">
@@ -265,6 +265,10 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
   const [selectedUpload, setSelectedUpload] = useState(null);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('upload');
+  const [usingCamera, setUsingCamera] = useState(false);
+  const fileInputRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
   // Load uploads for this specific station from localStorage and clean up old uploads
   useEffect(() => {
@@ -294,6 +298,58 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
       }
     }
   }, [stationId]);
+
+  // Add this function to handle camera access
+  const startCamera = async () => {
+    try {
+      setUsingCamera(true);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (error) {
+      console.error("Error accessing camera:", error);
+      setError("Could not access camera. Please check permissions.");
+      setUsingCamera(false);
+    }
+  };
+
+  // Add this function to capture photo
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      // Set canvas dimensions to match video
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // Draw the current video frame on the canvas
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Convert canvas to file
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const file = new File([blob], `camera-photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+          setSelectedFiles(prev => [...prev, file]);
+        }
+      }, 'image/jpeg', 0.8);
+      
+      // Stop camera stream
+      stopCamera();
+    }
+  };
+
+  // Add this function to stop camera
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks();
+      tracks.forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setUsingCamera(false);
+  };
 
   // Save uploads to localStorage whenever they change
   useEffect(() => {
@@ -478,33 +534,75 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
                 </div>
                 
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label htmlFor="images" className="block text-sm font-medium text-gray-700">
-                      Select Images
-                    </label>
+                <div className="space-y-2">
+                  <label htmlFor="images" className="block text-sm font-medium text-gray-700">
+                    Select Images
+                  </label>
+                  <div className="flex items-center gap-2">
                     <input
                       id="images"
                       type="file"
+                      ref={fileInputRef}
                       multiple
                       accept="image/*"
                       onChange={handleFileSelect}
                       className="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
+                    <button
+                      type="button"
+                      onClick={startCamera}
+                      className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    >
+                      📷
+                    </button>
                   </div>
-                  
-                  {selectedFiles.length > 0 && (
-                    <div className="text-sm text-gray-600">
-                      {selectedFiles.length} files selected
-                    </div>
-                  )}
-                  
-                  <button 
-                    onClick={handleUpload} 
-                    className="w-full bg-blue-600 text-white font-medium py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  >
-                    Upload Images
-                  </button>
                 </div>
+                
+                {/* Camera UI */}
+                {usingCamera && (
+                  <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+                    <div className="bg-white p-4 rounded-lg max-w-lg w-full">
+                      <h3 className="text-lg font-medium mb-2">Take a Photo</h3>
+                      <div className="relative">
+                        <video 
+                          ref={videoRef} 
+                          autoPlay 
+                          playsInline 
+                          className="w-full rounded-md"
+                        ></video>
+                        <canvas ref={canvasRef} className="hidden"></canvas>
+                      </div>
+                      <div className="mt-4 flex justify-between">
+                        <button
+                          onClick={stopCamera}
+                          className="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={capturePhoto}
+                          className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
+                        >
+                          Capture Photo
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {selectedFiles.length > 0 && (
+                  <div className="text-sm text-gray-600">
+                    {selectedFiles.length} files selected
+                  </div>
+                )}
+                
+                <button 
+                  onClick={handleUpload} 
+                  className="w-full bg-blue-600 text-white font-medium py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  Upload Images
+                </button>
+              </div>
               </div>
             </div>
           )}
