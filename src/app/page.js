@@ -46,12 +46,44 @@ const LoginPage = ({ onLoginSuccess }) => {
   
   // Station ID options
   const stationOptions = [
-    { id: 'GH001', name: 'Accra Main Office' },
-    { id: 'GH002', name: 'Kumasi Branch' },
-    { id: 'GH003', name: 'Tamale Office' },
-    { id: 'GH004', name: 'Takoradi Branch' },
-    { id: 'GH005', name: 'Cape Coast Office' },
-    { id: 'GH006', name: 'Tema Branch' },
+    // Greater Accra Region (GR)
+    { id: 'GR1', name: 'Accra Regional Office (Haatso)' },
+    { id: 'GR2', name: 'DVLA Headquarters (Cantonments)' },
+    { id: 'GR3', name: 'Tema Branch' },
+    { id: 'GR4', name: 'Weija Branch' },
+
+    // Ashanti Region (AR)
+    { id: 'AR1', name: 'Agona Ashanti Branch' },
+    { id: 'AR2', name: 'Bekwai Branch' },
+    { id: 'AR3', name: 'Kumasi Regional Office' },
+    { id: 'AR4', name: 'Mampong-Ashanti Branch' },
+    { id: 'AR5', name: 'Obuasi Branch' },
+    { id: 'AR6', name: 'Offinso Branch' },
+
+    // Brong-Ahafo Region (BA)
+    { id: 'BA1', name: 'Goaso Branch' },
+    { id: 'BA2', name: 'Kintampo Branch' },
+    { id: 'BA3', name: 'Sunyani Regional Office' },
+    { id: 'BA4', name: 'Techiman Branch' },
+
+    // Central Region (CR)
+    { id: 'CR1', name: 'Cape Coast Regional Office' },
+    { id: 'CR2', name: 'Dunkwa-On-Offin Branch' },
+    { id: 'CR3', name: 'Winneba Branch' },
+
+    // Eastern Region (ER)
+    { id: 'ER1', name: 'Koforidua Regional Office' },
+    { id: 'ER2', name: 'Akim Oda Branch' },
+    { id: 'ER3', name: 'Kyebi Branch' },
+    { id: 'ER4', name: 'Nkawkaw Branch' },
+
+    // Volta Region (VR)
+    { id: 'VR1', name: 'Ho Regional Office' },
+
+    // Western Region (WR)
+    { id: 'WR1', name: 'Sefwi Wiawso Branch' },
+    { id: 'WR2', name: 'Takoradi Regional Office' },
+    { id: 'WR3', name: 'Tarkwa Branch' },
   ];
   
   // For demo purposes - in a real app this would be validated on the server
@@ -371,13 +403,45 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
   // Get station name from ID
   const getStationName = (id) => {
     const stations = {
-      'GH001': 'Accra Main Office',
-      'GH002': 'Kumasi Branch',
-      'GH003': 'Tamale Office',
-      'GH004': 'Takoradi Branch',
-      'GH005': 'Cape Coast Office',
-      'GH006': 'Tema Branch',
-    };
+      // Greater Accra Region (GR)
+      'GR1': 'Accra Regional Office (Haatso)',
+      'GR2': 'DVLA Headquarters (Cantonments)',
+      'GR3': 'Tema Branch',
+      'GR4': 'Weija Branch',
+    
+      // Ashanti Region (AR)
+      'AR1': 'Agona Ashanti Branch',
+      'AR2': 'Bekwai Branch',
+      'AR3': 'Kumasi Regional Office',
+      'AR4': 'Mampong-Ashanti Branch',
+      'AR5': 'Obuasi Branch',
+      'AR6': 'Offinso Branch',
+    
+      // Brong-Ahafo Region (BA)
+      'BA1': 'Goaso Branch',
+      'BA2': 'Kintampo Branch',
+      'BA3': 'Sunyani Regional Office',
+      'BA4': 'Techiman Branch',
+    
+      // Central Region (CR)
+      'CR1': 'Cape Coast Regional Office',
+      'CR2': 'Dunkwa-On-Offin Branch',
+      'CR3': 'Winneba Branch',
+    
+      // Eastern Region (ER)
+      'ER1': 'Koforidua Regional Office',
+      'ER2': 'Akim Oda Branch',
+      'ER3': 'Kyebi Branch',
+      'ER4': 'Nkawkaw Branch',
+    
+      // Volta Region (VR)
+      'VR1': 'Ho Regional Office',
+    
+      // Western Region (WR)
+      'WR1': 'Sefwi Wiawso Branch',
+      'WR2': 'Takoradi Regional Office',
+      'WR3': 'Tarkwa Branch'
+    };    
     return stations[id] || id;
   };
 
