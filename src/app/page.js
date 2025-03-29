@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const VRSApp = () => {
   // Authentication state
@@ -131,7 +131,7 @@ const LoginPage = ({ onLoginSuccess }) => {
                 className="w-full"
               />
             </div>
-            <h2 className="text-2xl font-bold text-center">
+            <h2 className="text-2xl font-bold text-center text-gray-800">
               {showResetForm ? 'Reset Password' : 'VRS Image Upload'}
             </h2>
           </div>
@@ -156,28 +156,28 @@ const LoginPage = ({ onLoginSuccess }) => {
             {!showResetForm ? (
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <label htmlFor="stationId" className="block text-sm font-medium text-gray-700">
-                    Station ID
-                  </label>
-                  <select
-                    id="stationId"
-                    value={stationId}
-                    onChange={(e) => setStationId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Select Station ID</option>
-                    {stationOptions.map(station => (
-                      <option key={station.id} value={station.id}>
-                        {station.id} - {station.name}
-                      </option>
-                    ))}
-                  </select>
+                <label htmlFor="stationId" className="block text-sm font-medium text-gray-800">
+                  Station ID
+                </label>
+                <select
+                  id="stationId"
+                  value={stationId}
+                  onChange={(e) => setStationId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="" className="text-gray-800">Select Station ID</option>
+                  {stationOptions.map(station => (
+                    <option key={station.id} value={station.id} className="text-gray-800 font-medium">
+                      {station.id} - {station.name}
+                    </option>
+                  ))}
+                </select>
                 </div>
                 
                 <div className="space-y-2">
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                    Password
-                  </label>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-800">
+                  Password
+                </label>
                   <div className="relative">
                     <input
                       id="password"
@@ -185,7 +185,7 @@ const LoginPage = ({ onLoginSuccess }) => {
                       placeholder="Enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                     <button
                       type="button"
@@ -265,6 +265,10 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
   const [selectedUpload, setSelectedUpload] = useState(null);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('upload');
+  const [usingCamera, setUsingCamera] = useState(false);
+  const fileInputRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
   // Load uploads for this specific station from localStorage and clean up old uploads
   useEffect(() => {
@@ -294,6 +298,65 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
       }
     }
   }, [stationId]);
+
+  // Add this function to handle camera access
+  const startCamera = async () => {
+    try {
+      setUsingCamera(true);
+      // Specify that we want to use the rear camera (environment-facing)
+      const constraints = {
+        video: {
+          facingMode: "environment" // This requests the rear camera
+        }
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (error) {
+      console.error("Error accessing camera:", error);
+      setError("Could not access camera. Please check permissions.");
+      setUsingCamera(false);
+    }
+  };
+
+  // Add this function to capture photo
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      // Set canvas dimensions to match video
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // Draw the current video frame on the canvas
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Convert canvas to file
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const file = new File([blob], `camera-photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+          setSelectedFiles(prev => [...prev, file]);
+        }
+      }, 'image/jpeg', 0.8);
+      
+      // Stop camera stream
+      stopCamera();
+    }
+  };
+
+  // Add this function to stop camera
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks();
+      tracks.forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setUsingCamera(false);
+  };
 
   // Save uploads to localStorage whenever they change
   useEffect(() => {
@@ -386,6 +449,33 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
     document.body.removeChild(link);
   };
 
+  // Add this function to the ChassisImageManager component
+
+const downloadAllImages = () => {
+  if (!selectedUpload || selectedUpload.images.length === 0) return;
+  
+  // For each image, create a download
+  selectedUpload.images.forEach((image, index) => {
+    // Create link element
+    const link = document.createElement('a');
+    link.href = image.data;
+    
+    // Generate filename
+    const fileExtension = image.type.split('/')[1];
+    const fileName = image.name || `chassis-${selectedUpload.id}-image-${index + 1}.${fileExtension}`;
+    
+    // Set download attribute and trigger click
+    link.download = fileName;
+    
+    // Add slight delay between downloads to avoid browser throttling
+    setTimeout(() => {
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }, index * 100);
+  });
+};
+
   // Format file size for display
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes';
@@ -463,9 +553,9 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
               
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label htmlFor="chassisId" className="block text-sm font-medium text-gray-700">
-                    Chassis (last 4 numbers)
-                  </label>
+                <label htmlFor="chassisId" className="block text-sm font-medium text-gray-800">
+                  Chassis (last 4 numbers)
+                </label>
                   <input
                     id="chassisId"
                     type="text"
@@ -473,38 +563,80 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
                     maxLength={4}
                     value={chassisId}
                     onChange={(e) => setChassisId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
+                    className="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
                 </div>
                 
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label htmlFor="images" className="block text-sm font-medium text-gray-700">
-                      Select Images
-                    </label>
+                <div className="space-y-2">
+                  <label htmlFor="images" className="block text-sm font-medium text-gray-700">
+                    Select Images
+                  </label>
+                  <div className="flex items-center gap-2">
                     <input
                       id="images"
                       type="file"
+                      ref={fileInputRef}
                       multiple
                       accept="image/*"
                       onChange={handleFileSelect}
                       className="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
+                    <button
+                      type="button"
+                      onClick={startCamera}
+                      className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    >
+                      📷
+                    </button>
                   </div>
-                  
-                  {selectedFiles.length > 0 && (
-                    <div className="text-sm text-gray-600">
-                      {selectedFiles.length} files selected
-                    </div>
-                  )}
-                  
-                  <button 
-                    onClick={handleUpload} 
-                    className="w-full bg-blue-600 text-white font-medium py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  >
-                    Upload Images
-                  </button>
                 </div>
+                
+                {/* Camera UI */}
+                {usingCamera && (
+                  <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+                    <div className="bg-white p-4 rounded-lg max-w-lg w-full">
+                      <h3 className="text-lg font-medium mb-2">Take a Photo</h3>
+                      <div className="relative">
+                        <video 
+                          ref={videoRef} 
+                          autoPlay 
+                          playsInline 
+                          className="w-full rounded-md"
+                        ></video>
+                        <canvas ref={canvasRef} className="hidden"></canvas>
+                      </div>
+                      <div className="mt-4 flex justify-between">
+                        <button
+                          onClick={stopCamera}
+                          className="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={capturePhoto}
+                          className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
+                        >
+                          Capture Photo
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {selectedFiles.length > 0 && (
+                  <div className="text-sm text-gray-600">
+                    {selectedFiles.length} files selected
+                  </div>
+                )}
+                
+                <button 
+                  onClick={handleUpload} 
+                  className="w-full bg-blue-600 text-white font-medium py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  Upload Images
+                </button>
+              </div>
               </div>
             </div>
           )}
@@ -514,8 +646,8 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
             <div className="bg-white border rounded-lg shadow-sm p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="border rounded p-4">
-                  <h3 className="font-medium mb-4">Uploaded Sets</h3>
-                  {sortedUploads.length === 0 ? (
+                <h3 className="font-medium text-lg mb-4 text-gray-900">Uploaded Sets</h3>
+                {sortedUploads.length === 0 ? (
                     <div className="text-center text-gray-500 py-8">
                       No uploads yet
                     </div>
@@ -523,28 +655,39 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
                     <div className="space-y-2">
                       {sortedUploads.map((upload) => (
                         <button
-                          key={upload.id}
-                          className={`w-full text-left px-4 py-3 rounded-md border ${
-                            selectedUpload?.id === upload.id 
-                              ? 'bg-blue-50 border-blue-300 text-blue-700' 
-                              : 'bg-white border-gray-300 hover:bg-gray-50'
-                          }`}
-                          onClick={() => setSelectedUpload(upload)}
-                        >
-                          <div className="flex flex-col items-start">
-                            <span>Chassis #{upload.id}</span>
-                            <span className="text-xs opacity-70">
-                              {upload.displayDate} • {upload.fileCount} images
-                            </span>
-                          </div>
-                        </button>
+                        key={upload.id}
+                        className={`w-full text-left px-4 py-3 rounded-md border ${
+                          selectedUpload?.id === upload.id 
+                            ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' 
+                            : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-800 font-medium'
+                        }`}
+                        onClick={() => setSelectedUpload(upload)}
+                      >
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">Chassis #{upload.id}</span>
+                          <span className="text-xs text-gray-700">
+                            {upload.displayDate} • {upload.fileCount} images
+                          </span>
+                        </div>
+                      </button>
                       ))}
                     </div>
                   )}
                 </div>
 
                 <div className="border rounded p-4">
-                  <h3 className="font-medium mb-4">Preview</h3>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-medium text-lg text-gray-900">Preview</h3>
+                    {selectedUpload && (
+                      <button 
+                        onClick={downloadAllImages}
+                        className="bg-blue-600 text-white text-sm font-medium py-1 px-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      >
+                        Download All ({selectedUpload.images.length})
+                      </button>
+                    )}
+                  </div>
+                  
                   {selectedUpload ? (
                     <div className="space-y-6">
                       {selectedUpload.images.map((image, idx) => (
