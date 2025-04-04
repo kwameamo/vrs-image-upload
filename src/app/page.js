@@ -301,6 +301,7 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Load uploads for this specific station from localStorage and clean up old uploads
   useEffect(() => {
@@ -330,6 +331,21 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
       }
     }
   }, [stationId]);
+
+    // Filter uploads where chassis ID contains the search query
+    return [...uploads]
+      .filter(upload => upload.id.toLowerCase().includes(searchQuery.toLowerCase()))
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }, [uploads, searchQuery]);
+
+  // Add this function to filter uploads based on search
+  const filteredUploads = useMemo(() => {
+    if (!searchQuery.trim()) {
+      // If no search query, return all uploads sorted by timestamp
+      return [...uploads].sort((a, b) => 
+        new Date(b.timestamp) - new Date(a.timestamp)
+      );
+    }
 
   // Add this function to handle camera access
   const startCamera = async () => {
@@ -711,33 +727,62 @@ const downloadAllImages = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="border rounded p-4">
                 <h3 className="font-medium text-lg mb-4 text-gray-900">Uploaded Sets</h3>
-                {sortedUploads.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">
-                      No uploads yet
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {sortedUploads.map((upload) => (
-                        <button
-                        key={upload.id}
-                        className={`w-full text-left px-4 py-3 rounded-md border ${
-                          selectedUpload?.id === upload.id 
-                            ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' 
-                            : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-800 font-medium'
-                        }`}
-                        onClick={() => setSelectedUpload(upload)}
-                      >
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium">Chassis #{upload.id}</span>
-                          <span className="text-xs text-gray-700">
-                            {upload.displayDate} • {upload.fileCount} images
-                          </span>
-                        </div>
-                      </button>
-                      ))}
-                    </div>
-                  )}
+           
+                {/* Search Box */}
+        <div className="mb-4">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search chassis number..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full border border-gray-300 rounded-md shadow-sm pl-9 pr-3 py-2 text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-500"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+        
+        {filteredUploads.length === 0 ? (
+          <div className="text-center text-gray-500 py-8">
+            {uploads.length === 0 ? 'No uploads yet' : 'No matching chassis found'}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredUploads.map((upload) => (
+              <button
+                key={upload.id}
+                className={`w-full text-left px-4 py-3 rounded-md border ${
+                  selectedUpload?.id === upload.id 
+                    ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' 
+                    : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-800 font-medium'
+                }`}
+                onClick={() => setSelectedUpload(upload)}
+              >
+                <div className="flex flex-col items-start">
+                  <span className="font-medium">Chassis #{upload.id}</span>
+                  <span className="text-xs text-gray-700">
+                    {upload.displayDate} • {upload.fileCount} images
+                  </span>
                 </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
                 <div className="border rounded p-4">
                   <div className="flex justify-between items-center mb-4">
