@@ -332,12 +332,6 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
     }
   }, [stationId]);
 
-    // Filter uploads where chassis ID contains the search query
-    return [...uploads]
-      .filter(upload => upload.id.toLowerCase().includes(searchQuery.toLowerCase()))
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }, [uploads, searchQuery]);
-
   // Add this function to filter uploads based on search
   const filteredUploads = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -346,6 +340,12 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
         new Date(b.timestamp) - new Date(a.timestamp)
       );
     }
+    
+    // Filter uploads where chassis ID contains the search query
+    return [...uploads]
+      .filter(upload => upload.id.toLowerCase().includes(searchQuery.toLowerCase()))
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }, [uploads, searchQuery]);
 
   // Add this function to handle camera access
   const startCamera = async () => {
@@ -409,7 +409,13 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
   // Save uploads to localStorage whenever they change
   useEffect(() => {
     if (uploads.length > 0) {
-      localStorage.setItem(`vrsUploads_${stationId}`, JSON.stringify(uploads));
+      try {
+        localStorage.setItem(`vrsUploads_${stationId}`, JSON.stringify(uploads));
+      } catch (error) {
+        console.error("Error saving uploads to localStorage:", error);
+        setError("Warning: Could not save all uploads due to storage limitations.");
+        setTimeout(() => setError(""), 5000);
+      }
     } else {
       // If uploads array is empty, remove the item from localStorage
       localStorage.removeItem(`vrsUploads_${stationId}`);
@@ -529,32 +535,30 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
     document.body.removeChild(link);
   };
 
-  // Add this function to the ChassisImageManager component
-
-const downloadAllImages = () => {
-  if (!selectedUpload || selectedUpload.images.length === 0) return;
-  
-  // For each image, create a download
-  selectedUpload.images.forEach((image, index) => {
-    // Create link element
-    const link = document.createElement('a');
-    link.href = image.data;
+  const downloadAllImages = () => {
+    if (!selectedUpload || selectedUpload.images.length === 0) return;
     
-    // Generate filename
-    const fileExtension = image.type.split('/')[1];
-    const fileName = image.name || `chassis-${selectedUpload.id}-image-${index + 1}.${fileExtension}`;
-    
-    // Set download attribute and trigger click
-    link.download = fileName;
-    
-    // Add slight delay between downloads to avoid browser throttling
-    setTimeout(() => {
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }, index * 100);
-  });
-};
+    // For each image, create a download
+    selectedUpload.images.forEach((image, index) => {
+      // Create link element
+      const link = document.createElement('a');
+      link.href = image.data;
+      
+      // Generate filename
+      const fileExtension = image.type.split('/')[1];
+      const fileName = image.name || `chassis-${selectedUpload.id}-image-${index + 1}.${fileExtension}`;
+      
+      // Set download attribute and trigger click
+      link.download = fileName;
+      
+      // Add slight delay between downloads to avoid browser throttling
+      setTimeout(() => {
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, index * 100);
+    });
+  };
 
   // Format file size for display
   const formatFileSize = (bytes) => {
@@ -564,11 +568,6 @@ const downloadAllImages = () => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
-
-  // Sort uploads by timestamp in descending order (newest first)
-  const sortedUploads = [...uploads].sort((a, b) => 
-    new Date(b.timestamp) - new Date(a.timestamp)
-  );
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -729,60 +728,60 @@ const downloadAllImages = () => {
                 <h3 className="font-medium text-lg mb-4 text-gray-900">Uploaded Sets</h3>
            
                 {/* Search Box */}
-        <div className="mb-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search chassis number..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full border border-gray-300 rounded-md shadow-sm pl-9 pr-3 py-2 text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-500"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-        </div>
-        
-        {filteredUploads.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            {uploads.length === 0 ? 'No uploads yet' : 'No matching chassis found'}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredUploads.map((upload) => (
-              <button
-                key={upload.id}
-                className={`w-full text-left px-4 py-3 rounded-md border ${
-                  selectedUpload?.id === upload.id 
-                    ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' 
-                    : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-800 font-medium'
-                }`}
-                onClick={() => setSelectedUpload(upload)}
-              >
-                <div className="flex flex-col items-start">
-                  <span className="font-medium">Chassis #{upload.id}</span>
-                  <span className="text-xs text-gray-700">
-                    {upload.displayDate} • {upload.fileCount} images
-                  </span>
+                <div className="mb-4">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search chassis number..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md shadow-sm pl-9 pr-3 py-2 text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    {searchQuery && (
+                      <button 
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-500"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+                
+                {filteredUploads.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">
+                    {uploads.length === 0 ? 'No uploads yet' : 'No matching chassis found'}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredUploads.map((upload) => (
+                      <button
+                        key={upload.id}
+                        className={`w-full text-left px-4 py-3 rounded-md border ${
+                          selectedUpload?.id === upload.id 
+                            ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' 
+                            : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-800 font-medium'
+                        }`}
+                        onClick={() => setSelectedUpload(upload)}
+                      >
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">Chassis #{upload.id}</span>
+                          <span className="text-xs text-gray-700">
+                            {upload.displayDate} • {upload.fileCount} images
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
                 <div className="border rounded p-4">
                   <div className="flex justify-between items-center mb-4">
