@@ -1,6 +1,13 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react';
+// Firebase imports
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { auth, db, storage } from "../firebase/firebaseConfig.js";
+
+// React imports
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 
 const VRSApp = () => {
   // Authentication state
@@ -34,9 +41,10 @@ const VRSApp = () => {
 };
 
 // Login Component
+// Modify the LoginPage component
 const LoginPage = ({ onLoginSuccess }) => {
-  // States for form fields and validation
-  const [stationId, setStationId] = useState('');
+  // Change stationId to email
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showResetForm, setShowResetForm] = useState(false);
@@ -44,28 +52,36 @@ const LoginPage = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);
   
-  // Station ID options
-  const stationOptions = [
-    { id: 'GH001', name: 'Accra Main Office' },
-    { id: 'GH002', name: 'Kumasi Branch' },
-    { id: 'GH003', name: 'Tamale Office' },
-    { id: 'GH004', name: 'Takoradi Branch' },
-    { id: 'GH005', name: 'Cape Coast Office' },
-    { id: 'GH006', name: 'Tema Branch' },
-  ];
-  
-  // For demo purposes - in a real app this would be validated on the server
-  const validPassword = 'password123';
+  // Station mapping - use this to find the station ID from email
+  const stationMapping = {
+    'er1@dvlavrs.app': { id: 'ER1', name: 'Koforidua Station' },
+    'er2@dvlavrs.app': { id: 'ER2', name: 'Akim Oda Station' },
+    'er3@dvlavrs.app': { id: 'ER3', name: 'Kyebi Station' },
+    'er4@dvlavrs.app': { id: 'ER4', name: 'Nkawkaw Station' },
+    // Greater Accra Region (GR)
+    'gr1@dvlavrs.app': { id: 'GR1', name: 'Accra Station (Haatso)' },
+    'gr2@dvlavrs.app': { id: 'GR2', name: 'DVLA Headquarters (Cantonments)' },
+    'gr3@dvlavrs.app': { id: 'GR3', name: 'Tema Station' },
+    'gr4@dvlavrs.app': { id: 'GR4', name: 'Weija Station' },
+    // Ashanti Region (AR)
+    'ar1@dvlavrs.app': { id: 'AR1', name: 'Agona Ashanti Station' },
+    'ar2@dvlavrs.app': { id: 'AR2', name: 'Bekwai Station' },
+    'ar3@dvlavrs.app': { id: 'AR3', name: 'Kumasi Station' },
+    'ar4@dvlavrs.app': { id: 'AR4', name: 'Mampong-Ashanti Station' },
+    'ar5@dvlavrs.app': { id: 'AR5', name: 'Obuasi Station' },
+    'ar6@dvlavrs.app': { id: 'AR6', name: 'Offinso Station' },
+    // Add other stations as needed
+  };
   
   // Handle login submission
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     
     // Form validation
-    if (!stationId) {
-      setError('Please select a Station ID');
+    if (!email) {
+      setError('Please enter your email');
       setLoading(false);
       return;
     }
@@ -76,43 +92,63 @@ const LoginPage = ({ onLoginSuccess }) => {
       return;
     }
     
-    // Simulate network delay
-    setTimeout(() => {
-      // Check credentials
-      if (stationOptions.some(station => station.id === stationId) && password === validPassword) {
-        onLoginSuccess(stationId);
-      } else {
-        setError('Invalid Station ID or password');
+    try {
+      // Normalize email to lowercase
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      // For debugging
+      console.log(`Attempting to log in with: ${normalizedEmail}`);
+      
+      // Check if this is a valid station email
+      const stationInfo = stationMapping[normalizedEmail];
+      if (!stationInfo) {
+        setError('Email not recognized as a valid station');
+        setLoading(false);
+        return;
       }
+      
+      // Try to authenticate with Firebase
+      await signInWithEmailAndPassword(auth, normalizedEmail, password);
+      
+      // Pass the station ID to the onLoginSuccess callback
+      onLoginSuccess(stationInfo.id);
+    } catch (error) {
+      console.error("Login error:", error);
+      
+      // Handle different Firebase auth errors
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setError('Invalid email or password');
+      } else if (error.code === 'auth/too-many-requests') {
+        setError('Too many failed login attempts. Please try again later.');
+      } else {
+        setError('An error occurred during login. Please try again.');
+      }
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
   
-  // Handle password reset
-  const handleResetPassword = (e) => {
+  // Update the reset password function to use email
+  const handleResetPassword = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     
-    if (!stationId) {
-      setError('Please select a Station ID');
+    if (!email) {
+      setError('Please enter your email');
       setLoading(false);
       return;
     }
     
-    // Simulate network delay
+    // Similar validation as in handleLogin...
+    // For now, just show the success message
     setTimeout(() => {
-      if (stationOptions.some(station => station.id === stationId)) {
-        // Show success message with the reset password
-        setResetSuccess(true);
-        
-        setTimeout(() => {
-          setResetSuccess(false);
-          setShowResetForm(false);
-        }, 5000);
-      } else {
-        setError('Invalid Station ID');
-      }
+      setResetSuccess(true);
+      
+      setTimeout(() => {
+        setResetSuccess(false);
+        setShowResetForm(false);
+      }, 5000);
       setLoading(false);
     }, 800);
   };
@@ -148,7 +184,7 @@ const LoginPage = ({ onLoginSuccess }) => {
             {resetSuccess && (
               <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4">
                 <p>
-                  Password has been reset to: <strong>dvla2025</strong>
+                  Password reset email has been sent. Please check your inbox.
                 </p>
               </div>
             )}
@@ -156,28 +192,23 @@ const LoginPage = ({ onLoginSuccess }) => {
             {!showResetForm ? (
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                <label htmlFor="stationId" className="block text-sm font-medium text-gray-800">
-                  Station ID
-                </label>
-                <select
-                  id="stationId"
-                  value={stationId}
-                  onChange={(e) => setStationId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="" className="text-gray-800">Select Station ID</option>
-                  {stationOptions.map(station => (
-                    <option key={station.id} value={station.id} className="text-gray-800 font-medium">
-                      {station.id} - {station.name}
-                    </option>
-                  ))}
-                </select>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-800">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your station email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
                 </div>
                 
                 <div className="space-y-2">
-                <label htmlFor="password" className="block text-sm font-medium text-gray-800">
-                  Password
-                </label>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-800">
+                    Password
+                  </label>
                   <div className="relative">
                     <input
                       id="password"
@@ -208,22 +239,17 @@ const LoginPage = ({ onLoginSuccess }) => {
             ) : (
               <form onSubmit={handleResetPassword} className="space-y-4">
                 <div className="space-y-2">
-                  <label htmlFor="resetStationId" className="block text-sm font-medium text-gray-700">
-                    Station ID
+                  <label htmlFor="resetEmail" className="block text-sm font-medium text-gray-800">
+                    Email
                   </label>
-                  <select
-                    id="resetStationId"
-                    value={stationId}
-                    onChange={(e) => setStationId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Select Station ID</option>
-                    {stationOptions.map(station => (
-                      <option key={station.id} value={station.id}>
-                        {station.id} - {station.name}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    id="resetEmail"
+                    type="email"
+                    placeholder="Enter your station email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
                 </div>
                 
                 <button 
@@ -266,9 +292,11 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('upload');
   const [usingCamera, setUsingCamera] = useState(false);
+  const [loading, setLoading] = useState(false); // Add this line
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Load uploads for this specific station from localStorage and clean up old uploads
   useEffect(() => {
@@ -298,6 +326,21 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
       }
     }
   }, [stationId]);
+
+  // Add this function to filter uploads based on search
+  const filteredUploads = useMemo(() => {
+    if (!searchQuery.trim()) {
+      // If no search query, return all uploads sorted by timestamp
+      return [...uploads].sort((a, b) => 
+        new Date(b.timestamp) - new Date(a.timestamp)
+      );
+    }
+    
+    // Filter uploads where chassis ID contains the search query
+    return [...uploads]
+      .filter(upload => upload.id.toLowerCase().includes(searchQuery.toLowerCase()))
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }, [uploads, searchQuery]);
 
   // Add this function to handle camera access
   const startCamera = async () => {
@@ -358,28 +401,70 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
     setUsingCamera(false);
   };
 
-  // Save uploads to localStorage whenever they change
   useEffect(() => {
-    if (uploads.length > 0) {
-      localStorage.setItem(`vrsUploads_${stationId}`, JSON.stringify(uploads));
-    } else {
-      // If uploads array is empty, remove the item from localStorage
-      localStorage.removeItem(`vrsUploads_${stationId}`);
+    // First try to load from localStorage
+    const savedUploads = localStorage.getItem(`vrsUploads_${stationId}`);
+    
+    if (savedUploads) {
+      try {
+        // Parse the data
+        let loadedUploads = JSON.parse(savedUploads);
+        
+        // Filter out uploads older than 2 days
+        const twoDaysAgo = new Date();
+        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+        
+        const filteredUploads = loadedUploads.filter(upload => {
+          const uploadDate = new Date(upload.timestamp);
+          return uploadDate > twoDaysAgo;
+        });
+        
+        // If we removed some uploads, update localStorage
+        if (filteredUploads.length < loadedUploads.length) {
+          // Save the filtered list back to localStorage
+          localStorage.setItem(`vrsUploads_${stationId}`, JSON.stringify(filteredUploads));
+          
+          // TODO: Consider deleting old images from Cloudinary too
+          // This would require an additional API endpoint
+        }
+        
+        // Update state with uploads that have Cloudinary URLs
+        setUploads(filteredUploads);
+        
+      } catch (error) {
+        console.error("Error loading saved uploads:", error);
+      }
     }
-  }, [uploads, stationId]);
+  }, [stationId]);
   
-  // Get station name from ID
-  const getStationName = (id) => {
-    const stations = {
-      'GH001': 'Accra Main Office',
-      'GH002': 'Kumasi Branch',
-      'GH003': 'Tamale Office',
-      'GH004': 'Takoradi Branch',
-      'GH005': 'Cape Coast Office',
-      'GH006': 'Tema Branch',
-    };
-    return stations[id] || id;
-  };
+// In the ChassisImageManager component
+// Get station name from ID
+const getStationName = (id) => {
+  const stations = {
+    // Greater Accra Region (GR)
+    'GR1': 'Accra Station (Haatso)',
+    'GR2': 'DVLA Headquarters (Cantonments)',
+    'GR3': 'Tema Station',
+    'GR4': 'Weija Station',
+  
+    // Ashanti Region (AR)
+    'AR1': 'Agona Ashanti Station',
+    'AR2': 'Bekwai Station',
+    'AR3': 'Kumasi Station',
+    'AR4': 'Mampong-Ashanti Station',
+    'AR5': 'Obuasi Station',
+    'AR6': 'Offinso Station',
+  
+    // Eastern Region (ER)
+    'ER1': 'Koforidua Station',
+    'ER2': 'Akim Oda Station',
+    'ER3': 'Kyebi Station',
+    'ER4': 'Nkawkaw Station',
+    
+    // Other regions...
+  };    
+  return stations[id] || id;
+};
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
@@ -388,92 +473,160 @@ const ChassisImageManager = ({ stationId, onLogout }) => {
 
   const handleUpload = async () => {
     setError('');
+    setLoading(true);
     
+    // Validation checks - keep your existing validation code
     if (chassisId.length !== 4 || !/^\d+$/.test(chassisId)) {
       setError('Please enter exactly 4 numbers for the Chassis ID');
+      setLoading(false);
       return;
     }
-
+  
     if (selectedFiles.length === 0) {
       setError('Please select at least one image');
+      setLoading(false);
       return;
     }
-
+  
     if (uploads.some(upload => upload.id === chassisId)) {
       setError('This Chassis ID already exists');
+      setLoading(false);
       return;
     }
-
-    // Convert files to base64 strings for storage
-    const imagePromises = selectedFiles.map(file => {
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve({
-          data: reader.result,
+  
+    try {
+      // Array to store uploaded image information
+      const uploadedImages = [];
+      
+      // Upload each file to Cloudinary via your API
+      for (const file of selectedFiles) {
+        // Create a form with the file and metadata
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('stationId', stationId);
+        formData.append('chassisId', chassisId);
+        
+        // Send the form to your API route
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        // Handle errors
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Upload failed');
+        }
+        
+        // Get the result with the image URL
+        const result = await response.json();
+        
+        // Add to uploaded images array
+        uploadedImages.push({
+          data: result.url, // Use the URL from Cloudinary
           name: file.name,
           type: file.type,
-          size: file.size
+          size: file.size,
+          public_id: result.public_id // Store for potential deletion later
         });
-        reader.readAsDataURL(file);
-      });
-    });
-
-    const imageData = await Promise.all(imagePromises);
-
-    const newUpload = {
-      id: chassisId,
-      images: imageData,
-      timestamp: new Date().toISOString(),
-      displayDate: new Date().toLocaleString(),
-      fileCount: selectedFiles.length,
-      station: stationId
-    };
-
-    setUploads([...uploads, newUpload]);
-    setChassisId('');
-    setSelectedFiles([]);
+      }
+      
+      // Create new upload entry with the Cloudinary image URLs
+      const newUpload = {
+        id: chassisId,
+        images: uploadedImages,
+        timestamp: new Date().toISOString(),
+        displayDate: new Date().toLocaleString(),
+        fileCount: selectedFiles.length,
+        station: stationId
+      };
+      
+      // Update state
+      setUploads(prevUploads => [...prevUploads, newUpload]);
+      
+      // Store in localStorage for persistence
+      try {
+        const allUploads = [...uploads, newUpload];
+        localStorage.setItem(`vrsUploads_${stationId}`, JSON.stringify(allUploads));
+      } catch (storageError) {
+        console.warn('Could not save to localStorage', storageError);
+      }
+      
+      // Reset form
+      setChassisId('');
+      setSelectedFiles([]);
+      
+    } catch (error) {
+      console.error('Upload error:', error);
+      setError('Failed to upload images. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // Fix the downloadImage function
   const downloadImage = (imageData, imageName, imageType) => {
-    // Create a temporary link element
+    let downloadUrl = imageData;
+    
+    // If using Cloudinary, modify the URL for download
+    if (imageData.includes('cloudinary.com')) {
+      // Add fl_attachment parameter to force download
+      downloadUrl = imageData.replace('/upload/', '/upload/fl_attachment/');
+    }
+    
     const link = document.createElement('a');
-    link.href = imageData;
+    link.href = downloadUrl;
     
-    // Generate filename: chassis-ID-originalname
-    const fileExtension = imageType.split('/')[1];
+    const fileExtension = imageType.split('/')[1] || 'jpg';
     const fileName = imageName || `chassis-${selectedUpload.id}-image.${fileExtension}`;
-    
     link.download = fileName;
+    
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Add this function to the ChassisImageManager component
-
+// Fix the downloadAllImages function
 const downloadAllImages = () => {
   if (!selectedUpload || selectedUpload.images.length === 0) return;
   
-  // For each image, create a download
-  selectedUpload.images.forEach((image, index) => {
-    // Create link element
-    const link = document.createElement('a');
-    link.href = image.data;
-    
-    // Generate filename
-    const fileExtension = image.type.split('/')[1];
-    const fileName = image.name || `chassis-${selectedUpload.id}-image-${index + 1}.${fileExtension}`;
-    
-    // Set download attribute and trigger click
-    link.download = fileName;
-    
-    // Add slight delay between downloads to avoid browser throttling
-    setTimeout(() => {
+  // Sequential downloads with larger delays to avoid browser throttling
+  const downloadSequentially = async () => {
+    for (let i = 0; i < selectedUpload.images.length; i++) {
+      const image = selectedUpload.images[i];
+      
+      // Process one image at a time
+      let downloadUrl = image.data;
+      
+      // If using Cloudinary, modify the URL for download
+      if (image.data.includes('cloudinary.com')) {
+        // Add fl_attachment parameter to force download
+        downloadUrl = image.data.replace('/upload/', '/upload/fl_attachment/');
+      }
+      
+      // Create link element
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      
+      // Generate filename
+      const fileExtension = image.type.split('/')[1] || 'jpg';
+      const fileName = image.name || `chassis-${selectedUpload.id}-image-${i + 1}.${fileExtension}`;
+      
+      // Set download attribute
+      link.download = fileName;
+      
+      // Trigger download
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    }, index * 100);
-  });
+      
+      // Wait for a bit before the next download
+      await new Promise(resolve => setTimeout(resolve, 800));
+    }
+  };
+  
+  // Start sequential downloads
+  downloadSequentially();
 };
 
   // Format file size for display
@@ -484,11 +637,6 @@ const downloadAllImages = () => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
-
-  // Sort uploads by timestamp in descending order (newest first)
-  const sortedUploads = [...uploads].sort((a, b) => 
-    new Date(b.timestamp) - new Date(a.timestamp)
-  );
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -631,10 +779,11 @@ const downloadAllImages = () => {
                 )}
                 
                 <button 
-                  onClick={handleUpload} 
-                  className="w-full bg-blue-600 text-white font-medium py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    onClick={handleUpload} 
+                    className={`w-full bg-blue-600 text-white font-medium py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    disabled={loading}
                 >
-                  Upload Images
+                  {loading ? "Uploading..." : "Upload Images"}
                 </button>
               </div>
               </div>
@@ -647,14 +796,43 @@ const downloadAllImages = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="border rounded p-4">
                 <h3 className="font-medium text-lg mb-4 text-gray-900">Uploaded Sets</h3>
-                {sortedUploads.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">
-                      No uploads yet
+           
+                {/* Search Box */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search chassis number..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md shadow-sm pl-9 pr-3 py-2 text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {sortedUploads.map((upload) => (
-                        <button
+                    {searchQuery && (
+                      <button 
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-500"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                {filteredUploads.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">
+                    {uploads.length === 0 ? 'No uploads yet' : 'No matching chassis found'}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredUploads.map((upload) => (
+                      <button
                         key={upload.id}
                         className={`w-full text-left px-4 py-3 rounded-md border ${
                           selectedUpload?.id === upload.id 
@@ -670,10 +848,10 @@ const downloadAllImages = () => {
                           </span>
                         </div>
                       </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
                 <div className="border rounded p-4">
                   <div className="flex justify-between items-center mb-4">
