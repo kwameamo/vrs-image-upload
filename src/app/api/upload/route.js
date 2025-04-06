@@ -22,27 +22,32 @@ export async function POST(request) {
       );
     }
     
-    // Convert file to buffer
+    // Get file data
     const fileBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(fileBuffer);
     const base64Data = buffer.toString('base64');
+    const dataURI = `data:${file.type};base64,${base64Data}`;
     
-    // Upload to Cloudinary
+    // Upload to Cloudinary with promise pattern for better error handling
     const result = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload(
-        `data:${file.type};base64,${base64Data}`,
+        dataURI,
         {
           folder: 'vrs_uploads',
           public_id: `${stationId}/${chassisId}/${Date.now()}`
         },
         (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
+          if (error) {
+            console.error('Cloudinary error:', error);
+            reject(error);
+          } else {
+            resolve(result);
+          }
         }
       );
     });
     
-    // Return the URL
+    // Return success response
     return NextResponse.json({
       url: result.secure_url,
       public_id: result.public_id
@@ -50,8 +55,16 @@ export async function POST(request) {
   } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json(
-      { error: 'Upload failed' },
+      { error: 'Upload failed: ' + (error.message || 'Unknown error') },
       { status: 500 }
     );
   }
 }
+
+// Set config for larger payloads
+export const config = {
+  api: {
+    bodyParser: false,
+    responseLimit: '10mb',
+  },
+};

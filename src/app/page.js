@@ -475,7 +475,7 @@ const getStationName = (id) => {
     setError('');
     setLoading(true);
     
-    // Validation checks - keep your existing validation code
+    // Validation
     if (chassisId.length !== 4 || !/^\d+$/.test(chassisId)) {
       setError('Please enter exactly 4 numbers for the Chassis ID');
       setLoading(false);
@@ -488,46 +488,42 @@ const getStationName = (id) => {
       return;
     }
   
-    if (uploads.some(upload => upload.id === chassisId)) {
-      setError('This Chassis ID already exists');
+    // Check file sizes - Vercel has 4.5MB limit for serverless functions
+    const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
+    const oversizedFiles = selectedFiles.filter(file => file.size > MAX_FILE_SIZE);
+    if (oversizedFiles.length > 0) {
+      setError(`${oversizedFiles.length} file(s) exceed the 4MB size limit. Please compress or select smaller images.`);
       setLoading(false);
       return;
     }
   
     try {
-      // Array to store uploaded image information
       const uploadedImages = [];
       
-      // Upload each file to Cloudinary via your API
       for (const file of selectedFiles) {
-        // Create a form with the file and metadata
         const formData = new FormData();
         formData.append('file', file);
         formData.append('stationId', stationId);
         formData.append('chassisId', chassisId);
         
-        // Send the form to your API route
         const response = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
         });
         
-        // Handle errors
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Upload failed');
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Upload failed');
         }
         
-        // Get the result with the image URL
         const result = await response.json();
         
-        // Add to uploaded images array
         uploadedImages.push({
-          data: result.url, // Use the URL from Cloudinary
+          data: result.url,
           name: file.name,
           type: file.type,
           size: file.size,
-          public_id: result.public_id // Store for potential deletion later
+          public_id: result.public_id
         });
       }
       
