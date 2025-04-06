@@ -582,16 +582,24 @@ const getStationName = (id) => {
     document.body.removeChild(link);
   };
 
-// Fix the downloadAllImages function
-const downloadAllImages = () => {
+// Fixed downloadAllImages function
+const downloadAllImages = async () => {
   if (!selectedUpload || selectedUpload.images.length === 0) return;
   
-  // Sequential downloads with larger delays to avoid browser throttling
-  const downloadSequentially = async () => {
+  try {
+    // Show loading state
+    setLoading(true);
+    
+    // Inform the user about the multiple downloads
+    if (selectedUpload.images.length > 1) {
+      alert(`${selectedUpload.images.length} images will be downloaded one by one. Click OK to begin.`);
+    }
+    
+    // Download each image sequentially with a longer delay
     for (let i = 0; i < selectedUpload.images.length; i++) {
       const image = selectedUpload.images[i];
       
-      // Process one image at a time
+      // Create a download link
       let downloadUrl = image.data;
       
       // If using Cloudinary, modify the URL for download
@@ -600,29 +608,34 @@ const downloadAllImages = () => {
         downloadUrl = image.data.replace('/upload/', '/upload/fl_attachment/');
       }
       
-      // Create link element
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      
       // Generate filename
       const fileExtension = image.type.split('/')[1] || 'jpg';
       const fileName = image.name || `chassis-${selectedUpload.id}-image-${i + 1}.${fileExtension}`;
       
-      // Set download attribute
+      // Create and trigger download
+      const link = document.createElement('a');
+      link.href = downloadUrl;
       link.download = fileName;
-      
-      // Trigger download
       document.body.appendChild(link);
+      
+      // Trigger click
       link.click();
+      
+      // Remove link
       document.body.removeChild(link);
       
-      // Wait for a bit before the next download
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Wait longer between downloads (2.5 seconds)
+      // This longer delay helps browsers process each download request properly
+      if (i < selectedUpload.images.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2500));
+      }
     }
-  };
-  
-  // Start sequential downloads
-  downloadSequentially();
+  } catch (error) {
+    console.error("Download error:", error);
+    setError("There was an error downloading the images. Please try again or download them individually.");
+  } finally {
+    setLoading(false);
+  }
 };
 
   // Format file size for display
